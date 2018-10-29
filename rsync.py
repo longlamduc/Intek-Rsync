@@ -2,10 +2,16 @@
 import argparse
 import os
 from os import path
-def get_file():
+
+
+def get_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("src", action = "store", help = "source file")
-    parser.add_argument("dest", action = "store", help = "destination file")
+    parser.add_argument("src", action="store", help="source file")
+    parser.add_argument("dest", action="store", help="destination file")
+    parser.add_argument("-u", "--update", actions="store_true",
+                        help="skip files that are newer on the receiver")
+    parser.add_argument("-c", "--checksum", actions="store_true",
+                        help="skip based on checksum, not mod-time & size")
     args = parser.parse_args()
     return [args.src, args.dest]
 
@@ -23,7 +29,8 @@ def change_time_permission(source, dest):
 def copy_file(source, dest):
     file = os.open(source, os.O_RDONLY)
     if path.isdir(path.abspath(dest)):
-        file_copy = os.open(path.abspath(dest)+'/'+source, os.O_RDWR | os.O_CREAT)
+        tmp_path = path.abspath(dest)+'/'+source
+        file_copy = os.open(tmp_path, os.O_RDWR | os.O_CREAT)
     else:
         file_copy = os.open(dest, os.O_RDWR | os.O_CREAT)
     content = os.read(file, 16 * 1024)
@@ -48,11 +55,14 @@ def link(source, dest):
 
 
 def main():
-    tmp = get_file()
+    tmp = get_arguments()
     source = tmp[0]
-    dest  =tmp[1]
+    dest = tmp[1]
     strpath = path.abspath(dest)
     src_path = path.abspath(source)
+    if not path.exists(src_path):
+        print('rsync: link_stat "' + src_path +
+                    '" failed: No such file or directory (2)')
     if path.isdir(src_path):
         print('skipping directory', source)
     elif path.isfile(src_path):
