@@ -8,43 +8,34 @@ def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("src", action="store", help="source file")
     parser.add_argument("dest", action="store", help="destination file")
-    parser.add_argument("-u", "--update", actions="store_true",
+    parser.add_argument("-u", "--update", action="store_true",
                         help="skip files that are newer on the receiver")
-    parser.add_argument("-c", "--checksum", actions="store_true",
+    parser.add_argument("-c", "--checksum", action="store_true",
                         help="skip based on checksum, not mod-time & size")
     args = parser.parse_args()
-    return [args.src, args.dest]
+    return args
 
 
-def change_time_permission(source, dest):
-    file = os.open(source, os.O_RDONLY)
+def change_time_permission(src_path, dest_path):
+    file = os.open(src_path, os.O_RDONLY)
     time = os.stat(file)
     atime = time.st_atime
     mtime = time.st_mtime
-    os.utime(path.abspath(dest), (atime, mtime))
-    os.chmod(path.abspath(dest), time.st_mode)
+    os.utime(dest_path, (atime, mtime))
+    os.chmod(dest_path, time.st_mode)
     os.close(file)
 
 
-def copy_file(source, dest):
-    file = os.open(source, os.O_RDONLY)
-    if path.isdir(path.abspath(dest)):
-        tmp_path = path.abspath(dest)+'/'+source
-        file_copy = os.open(tmp_path, os.O_RDWR | os.O_CREAT)
-    else:
-        file_copy = os.open(dest, os.O_RDWR | os.O_CREAT)
+def copy_file(src_path, dest_path):
+    file = os.open(src_path, os.O_RDONLY)
+    file_copy = os.open(dest_path, os.O_RDWR)
     content = os.read(file, 16 * 1024)
     os.write(file_copy, content)
     os.close(file)
     os.close(file_copy)
 
 
-def link(source, dest):
-    src_path = path.abspath(source)
-    if path.isdir(path.abspath(dest)):
-        dest_path = path.abspath(dest) + '/' + source
-    else:
-        dest_path = path.abspath(dest)
+def link(src_path, dest_path):
     if os.stat(src_path).st_nlink > 1:
         os.unlink(dest_path)
         os.link(src_path, dest_path)
@@ -54,21 +45,44 @@ def link(source, dest):
         os.symlink(sym_link, dest_path)
 
 
+def check(src_path, dest_path):
+    src_status = os.stat(src_path)
+    dest_status = os.stat(dest_path)
+    satime = src_status.st_atime #get atime, mtime and size of source
+    smtime = src_status.st_mtime
+    ssize = src_status.st_size
+    datime = dest_status.st_atime #get atime, mtime and size of dest
+    dmtime = dest_status.st_mtime
+    dsize = dest_status.st_size
+    if (satime, smtime, ssize) == (datime, dmtime, dsize):
+        return True
+    return False
+
+
 def main():
     tmp = get_arguments()
-    source = tmp[0]
-    dest = tmp[1]
-    strpath = path.abspath(dest)
+    source = tmp.src
+    dest = tmp.dest
+    #get source path and dest path
+    if path.isdir(path.abspath(dest)):
+        dest_path = path.abspath(dest) + '/' + source
+    else:
+        dest_path = path.abspath(dest)
     src_path = path.abspath(source)
-    if not path.exists(src_path):
+    #rsync
+    if not path.exists(src_path):       #source doesn't exist
         print('rsync: link_stat "' + src_path +
                     '" failed: No such file or directory (2)')
-    if path.isdir(src_path):
+    if path.isdir(src_path):            #source is dir
         print('skipping directory', source)
-    elif path.isfile(src_path):
-        copy_file(source, dest)
-        change_time_permission(source, dest)
-        link(source, dest)
+    elif path.isfile(src_path):         #source is file
+        if not path.exists(dest_path):
+            file = os.open(dest_path, os.O_CREAT)
+            os.close(file)
+        if not check(src_path, dest_path):
+            copy_file(src_path, dest_path)
+            change_time_permission(src_path, dest_path)
+            link(src_path, dest_path)
 
 
 main()
