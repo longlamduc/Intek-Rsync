@@ -4,7 +4,7 @@ import os
 from os import path
 
 
-def get_arguments():
+def get_arguments():    #get all the arguments from terminal
     parser = argparse.ArgumentParser()
     parser.add_argument("src", action="store", help="source file")
     parser.add_argument("dest", action="store", help="destination file")
@@ -17,6 +17,7 @@ def get_arguments():
 
 
 def change_time_permission(src_path, dest_path):
+    #update time and permission of destination file
     file = os.open(src_path, os.O_RDONLY)
     time = os.stat(file)
     atime = time.st_atime
@@ -29,7 +30,8 @@ def change_time_permission(src_path, dest_path):
 def copy_file(src_path, dest_path):
     file = os.open(src_path, os.O_RDONLY)
     file_copy = os.open(dest_path, os.O_RDWR)
-    content = os.read(file, 16 * 1024)
+    time = os.stat(file)
+    content = os.read(file, time.st_size)
     os.write(file_copy, content)
     os.close(file)
     os.close(file_copy)
@@ -40,7 +42,7 @@ def link(src_path, dest_path):
         os.unlink(dest_path)
         os.link(src_path, dest_path)
     elif os.path.islink(src_path):
-        sym_link = os.read_link(src_path)
+        sym_link = os.readlink(src_path)
         os.unlink(dest_path)
         os.symlink(sym_link, dest_path)
 
@@ -77,7 +79,7 @@ def main():
         print('skipping directory', source)
     elif path.isfile(src_path):         #source is file
         if not path.exists(dest_path):
-            file = os.open(dest_path, os.O_CREAT)
+            file = os.open(dest_path, os.O_RDWR|os.O_CREAT)
             os.close(file)
         if not check(src_path, dest_path):
             copy_file(src_path, dest_path)
