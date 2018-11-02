@@ -108,12 +108,12 @@ def main():
     # get source path and dest path
     src_path = path.abspath(source)
     # rsync
-    if not os.access(src_path, os.R_OK):
-        print('rsync: send_files failed to open "' + src_path +
-              '": Permission denied (13)')
-    elif not path.exists(src_path):       # source doesn't exist
+    if not path.exists(src_path):       # source doesn't exist
         print('rsync: link_stat "' + src_path +
               '" failed: No such file or directory (2)')
+    elif not os.access(src_path, os.R_OK):
+        print('rsync: send_files failed to open "' + src_path +
+              '": Permission denied (13)')
     elif path.isdir(src_path):            # source is directory
         print('skipping directory', source)
     else:
