@@ -4,7 +4,7 @@ import os
 from os import path
 
 
-def get_arguments():    #get all the arguments from terminal
+def get_arguments():    # get all the arguments from terminal
     parser = argparse.ArgumentParser()
     parser.add_argument("src", action="store", help="source file")
     parser.add_argument("dest", action="store", help="destination file")
@@ -16,8 +16,32 @@ def get_arguments():    #get all the arguments from terminal
     return args
 
 
+def checktime(src_path, dest_path):
+    src_status = os.stat(src_path)
+    dest_status = os.stat(dest_path)
+    smtime = src_status.st_mtime
+    dmtime = dest_status.st_mtime
+    if dmtime > smtime:
+        return False
+    return True
+
+
+def checksum(src_path, dest_path):
+    if not path.exists(dest_path):
+        return False
+    else:
+        file = os.open(src_path, os.O_RDONLY)
+        dest_file = os.open(dest_path, os.O_RDONLY)
+        src_content = os.read(file, path.getsize(src_path))
+        dest_content = os.read(dest_file, path.getsize(dest_path))
+        for x in range(len(src_content)):
+            if src_content[x] != dest_content[x]:
+                return False
+        return True
+
+
 def change_time_permission(src_path, dest_path):
-    #update time and permission of destination file
+    # update time and permission of destination file
     file = os.open(src_path, os.O_RDONLY)
     time = os.stat(file)
     atime = time.st_atime
@@ -30,11 +54,28 @@ def change_time_permission(src_path, dest_path):
 def copy_file(src_path, dest_path):
     file = os.open(src_path, os.O_RDONLY)
     file_copy = os.open(dest_path, os.O_RDWR)
-    time = os.stat(file)
-    content = os.read(file, time.st_size)
+    status = os.stat(file)
+    content = os.read(file, status.st_size)
     os.write(file_copy, content)
     os.close(file)
     os.close(file_copy)
+
+
+def update(src_path, dest_path):
+    file = os.open(src_path, os.O_RDONLY)
+    src_content = os.read(file, path.getsize(src_path))
+    dest_file = os.open(dest_path, os.O_RDWR | os.O_CREAT)
+    dest_content = os.read(dest_file, path.getsize(dest_path))
+    count = 0
+    while count < path.getsize(src_path):
+        os.lseek(file, count, 0)
+        os.lseek(dest_file, count, 0)
+        if count < len(dest_content):
+            if dest_content[count] != src_content[count]:
+                os.write(dest_file, os.read(file, 1))
+        else:
+            os.write(dest_file, os.read(file, 1))
+        count += 1
 
 
 def link(src_path, dest_path):
@@ -50,39 +91,56 @@ def link(src_path, dest_path):
 def check(src_path, dest_path):
     src_status = os.stat(src_path)
     dest_status = os.stat(dest_path)
-    satime = src_status.st_atime #get atime, mtime and size of source
-    smtime = src_status.st_mtime
+    smtime = src_status.st_mtime  # mtime and size of source
     ssize = src_status.st_size
-    datime = dest_status.st_atime #get atime, mtime and size of dest
-    dmtime = dest_status.st_mtime
+    dmtime = dest_status.st_mtime  # mtime and size of dest
     dsize = dest_status.st_size
-    if (satime, smtime, ssize) == (datime, dmtime, dsize):
+    if (smtime, ssize) == (dmtime, dsize):
         return True
     return False
 
 
 def main():
-    tmp = get_arguments()
-    source = tmp.src
-    dest = tmp.dest
-    #get source path and dest path
-    if path.isdir(path.abspath(dest)):
-        dest_path = path.abspath(dest) + '/' + source
-    else:
-        dest_path = path.abspath(dest)
+    args = get_arguments()
+    source = args.src
+    dest = args.dest
+    change = 1
+    # get source path and dest path
     src_path = path.abspath(source)
-    #rsync
-    if not path.exists(src_path):       #source doesn't exist
+    # rsync
+    if not os.access(src_path, os.R_OK) :
+        print('rsync: send_files failed to open "' + src_path +
+              '": Permission denied (13)')
+    elif not path.exists(src_path):       # source doesn't exist
         print('rsync: link_stat "' + src_path +
-                    '" failed: No such file or directory (2)')
-    if path.isdir(src_path):            #source is dir
+              '" failed: No such file or directory (2)')
+    elif path.isdir(src_path):            # source is directory
         print('skipping directory', source)
-    elif path.isfile(src_path):         #source is file
-        if not path.exists(dest_path):
-            file = os.open(dest_path, os.O_RDWR|os.O_CREAT)
-            os.close(file)
-        if not check(src_path, dest_path):
-            copy_file(src_path, dest_path)
+    else:
+        if path.isdir(path.abspath(dest)):
+            dest_path = path.abspath(dest) + '/' + source
+        else:
+            dest_path = path.abspath(dest)
+        if args.checksum:
+            # if -c is chosen
+            if checksum(src_path, dest_path):
+                change = 0
+        elif args.update:
+            # if -u argument is chosen
+            if not checktime(src_path, dest_path):
+                # check if dest file is newer than src file or not
+                change = 0
+                # if dest_path is newer then no change happen
+        if change == 1 and src_path != dest_path:
+            # rsync will be executed
+            if not path.exists(dest_path):
+                file = os.open(dest_path, os.O_CREAT)
+                copy_file(src_path, dest_path)
+            else:
+                if path.getsize(src_path) < path.getsize(dest_path):
+                    copy_file(src_path, dest_path)
+                else:
+                    update(src_path, dest_path)
             change_time_permission(src_path, dest_path)
             link(src_path, dest_path)
 
