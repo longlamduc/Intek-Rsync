@@ -53,11 +53,8 @@ def change_time_permission(src_path, dest_path):
 
 def copy_file(src_path, dest_path):
     file = os.open(src_path, os.O_RDONLY)
-    if path.getsize(dest_path) > 0:
-        os.unlink(dest_path)
-        file_copy = os.open(dest_path, os.O_WRONLY | os.O_CREAT)
-    else:
-        file_copy = os.open(dest_path, os.O_WRONLY)
+    os.unlink(dest_path)
+    file_copy = os.open(dest_path, os.O_WRONLY | os.O_CREAT)
     status = os.stat(file)
     content = os.read(file, status.st_size)
     os.write(file_copy, content)
@@ -141,7 +138,7 @@ def main():
         if change == 1 and src_path != dest_path:
             # rsync will be executed
             if not path.exists(dest_path):
-                file = os.open(dest_path, os.O_CREAT)
+                # file = os.open(dest_path, os.O_CREAT)
                 copy_file(src_path, dest_path)
                 rsync = 1
             else:
