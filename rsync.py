@@ -82,8 +82,8 @@ def update(src_path, dest_path):
 
 def link(src_path, dest_path):
     if os.stat(src_path).st_nlink > 1:
-        os.link(src_path, dest_path)
         os.unlink(dest_path)
+        os.link(src_path, dest_path)
     elif os.path.islink(src_path):
         os.unlink(dest_path)
         sym_link = os.readlink(src_path)
