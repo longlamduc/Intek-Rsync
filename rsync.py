@@ -138,7 +138,7 @@ def main():
         if change == 1 and src_path != dest_path:
             # rsync will be executed
             if not path.exists(dest_path):
-                # file = os.open(dest_path, os.O_CREAT)
+                file = os.open(dest_path, os.O_CREAT)
                 copy_file(src_path, dest_path)
                 rsync = 1
             else:
