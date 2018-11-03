@@ -53,7 +53,11 @@ def change_time_permission(src_path, dest_path):
 
 def copy_file(src_path, dest_path):
     file = os.open(src_path, os.O_RDONLY)
-    file_copy = os.open(dest_path, os.O_RDWR)
+    if path.getsize(dest_path) > 0:
+        os.unlink(dest_path)
+        file_copy = os.open(dest_path, os.O_WRONLY | os.O_CREAT)
+    else:
+        file_copy = os.open(dest_path, os.O_WRONLY)
     status = os.stat(file)
     content = os.read(file, status.st_size)
     os.write(file_copy, content)
@@ -73,6 +77,7 @@ def update(src_path, dest_path):
         if count < len(dest_content):
             if dest_content[count] != src_content[count]:
                 os.write(dest_file, os.read(file, 1))
+                os.read(file, 1)
         else:
             os.write(dest_file, os.read(file, 1))
         count += 1
@@ -80,11 +85,11 @@ def update(src_path, dest_path):
 
 def link(src_path, dest_path):
     if os.stat(src_path).st_nlink > 1:
-        os.unlink(dest_path)
         os.link(src_path, dest_path)
-    elif os.path.islink(src_path):
-        sym_link = os.readlink(src_path)
         os.unlink(dest_path)
+    elif os.path.islink(src_path):
+        os.unlink(dest_path)
+        sym_link = os.readlink(src_path)
         os.symlink(sym_link, dest_path)
 
 
@@ -140,7 +145,7 @@ def main():
                 copy_file(src_path, dest_path)
                 rsync = 1
             else:
-                if not check(src_path, dest_path):
+                if check(src_path, dest_path) is False:
                     rsync = 1
                     if path.getsize(src_path) < path.getsize(dest_path):
                         copy_file(src_path, dest_path)
