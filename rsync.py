@@ -95,7 +95,7 @@ def check(src_path, dest_path):
     ssize = src_status.st_size
     dmtime = dest_status.st_mtime  # mtime and size of dest
     dsize = dest_status.st_size
-    if (smtime, ssize) == (dmtime, dsize):
+    if smtime == dmtime and ssize == dsize:
         return True
     return False
 
@@ -105,20 +105,22 @@ def main():
     source = args.src
     dest = args.dest
     change = 1
+    rsync = 0
     # get source path and dest path
     src_path = path.abspath(source)
     # rsync
     if not path.exists(src_path):       # source doesn't exist
         print('rsync: link_stat "' + src_path +
               '" failed: No such file or directory (2)')
-    elif not os.access(src_path, os.R_OK):
+    elif not os.access(src_path, os.R_OK):  # cannot read source
         print('rsync: send_files failed to open "' + src_path +
               '": Permission denied (13)')
     elif path.isdir(src_path):            # source is directory
         print('skipping directory', source)
     else:
         if path.isdir(path.abspath(dest)):
-            dest_path = path.abspath(dest) + '/' + source
+            t = source.split('/')
+            dest_path = path.abspath(dest) + '/' + t[len(t) - 1]
         else:
             dest_path = path.abspath(dest)
         if args.checksum:
@@ -136,13 +138,17 @@ def main():
             if not path.exists(dest_path):
                 file = os.open(dest_path, os.O_CREAT)
                 copy_file(src_path, dest_path)
+                rsync = 1
             else:
-                if path.getsize(src_path) < path.getsize(dest_path):
-                    copy_file(src_path, dest_path)
-                else:
-                    update(src_path, dest_path)
-            change_time_permission(src_path, dest_path)
-            link(src_path, dest_path)
+                if not check(src_path, dest_path):
+                    rsync = 1
+                    if path.getsize(src_path) < path.getsize(dest_path):
+                        copy_file(src_path, dest_path)
+                    else:
+                        update(src_path, dest_path)
+            if rsync == 1:
+                change_time_permission(src_path, dest_path)
+                link(src_path, dest_path)
 
 
 main()
